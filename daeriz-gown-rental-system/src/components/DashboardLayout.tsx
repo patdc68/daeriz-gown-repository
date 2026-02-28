@@ -8,7 +8,7 @@ import DashboardHeader from './DashboardHeader';
 import DashboardSidebar from './DashboardSidebar';
 import SitemarkIcon from './SitemarkIcon';
 import { supabase } from '../services/supabase';
-import { Typography } from '@mui/material';
+
 
 export default function DashboardLayout() {
   const navigate = useNavigate();
