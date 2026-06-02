@@ -28,9 +28,10 @@ export interface BranchRentalSummary {
   percentage: number;
 }
 
-export interface TopItemSummary {
+export interface TopRentedItemSummary {
   branchId: string;
   branchName: string;
+  rank: number;
   itemId: string;
   itemName: string;
   imageUrl: string | null;
@@ -41,7 +42,7 @@ export interface TopItemSummary {
 export interface RentalAnalytics {
   totalRentals: number;
   branches: BranchRentalSummary[];
-  topItems: TopItemSummary[];
+  topRentedItems: TopRentedItemSummary[];
 }
 
 export function getAnalyticsDateRange(scope: AnalyticsScope, now: Dayjs = dayjs()) {
@@ -93,25 +94,30 @@ export function summarizeRentalAnalytics(
     percentage: totalRentals ? (rentalCount / totalRentals) * 100 : 0,
   })).sort((a, b) => b.rentalCount - a.rentalCount || a.branchName.localeCompare(b.branchName));
 
-  const topItems = Array.from(rentalsPerBranchItem, ([branchId, itemCounts]) => {
-    const [itemId, rentalCount] = Array.from(itemCounts).sort(([aId, aCount], [bId, bCount]) =>
-      bCount - aCount || itemName(aId, items).localeCompare(itemName(bId, items)),
-    )[0];
-    const item = items.get(itemId);
-    const branchRentalCount = rentalsPerBranch.get(branchId) ?? 0;
+  const topRentedItems = branchSummaries.flatMap(({ branchId, branchName: currentBranchName, rentalCount: branchRentalCount }) => {
+    const itemCounts = rentalsPerBranchItem.get(branchId);
+    if (!itemCounts) return [];
 
-    return {
-      branchId,
-      branchName: branchName(branchId, branches),
-      itemId,
-      itemName: itemName(itemId, items),
-      imageUrl: item?.image_url ?? null,
-      rentalCount,
-      branchShare: branchRentalCount ? (rentalCount / branchRentalCount) * 100 : 0,
-    };
-  }).sort((a, b) => b.rentalCount - a.rentalCount || a.branchName.localeCompare(b.branchName));
+    return Array.from(itemCounts)
+      .sort(([aId, aCount], [bId, bCount]) =>
+        bCount - aCount
+        || itemName(aId, items).localeCompare(itemName(bId, items))
+        || aId.localeCompare(bId),
+      )
+      .slice(0, 3)
+      .map(([itemId, rentalCount], index) => ({
+        branchId,
+        branchName: currentBranchName,
+        rank: index + 1,
+        itemId,
+        itemName: itemName(itemId, items),
+        imageUrl: items.get(itemId)?.image_url ?? null,
+        rentalCount,
+        branchShare: branchRentalCount ? (rentalCount / branchRentalCount) * 100 : 0,
+      }));
+  });
 
-  return { totalRentals, branches: branchSummaries, topItems };
+  return { totalRentals, branches: branchSummaries, topRentedItems };
 }
 
 export async function getRentalAnalytics(scope: AnalyticsScope): Promise<RentalAnalytics> {
