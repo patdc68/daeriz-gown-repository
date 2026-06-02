@@ -38,7 +38,9 @@ export default function DashboardSidebar({
 
   const { pathname } = useLocation();
 
-  const [expandedItemIds, setExpandedItemIds] = React.useState<string[]>([]);
+  const [expandedItemIds, setExpandedItemIds] = React.useState<string[]>(() =>
+    matchPath('/reports/*', pathname) ? ['reports'] : [],
+  );
 
   const isOverSmViewport = useMediaQuery(theme.breakpoints.up('sm'));
   const isOverMdViewport = useMediaQuery(theme.breakpoints.up('md'));
@@ -147,8 +149,8 @@ export default function DashboardSidebar({
               title="Reports"
               icon={<BarChartIcon />}
               href="/reports"
-              selected={!!matchPath('/reports', pathname)}
-              defaultExpanded={!!matchPath('/reports', pathname)}
+              selected={!!matchPath('/reports/*', pathname)}
+              defaultExpanded={!!matchPath('/reports/*', pathname)}
               expanded={expandedItemIds.includes('reports')}
               nestedNavigation={
                 <List
@@ -187,6 +189,13 @@ export default function DashboardSidebar({
                     icon={<DescriptionIcon />}
                     href="/reports/history"
                     selected={!!matchPath('/reports/history', pathname)}
+                  />
+                  <DashboardSidebarPageItem
+                    id="analytics"
+                    title="Analytics"
+                    icon={<BarChartIcon />}
+                    href="/reports/analytics"
+                    selected={!!matchPath('/reports/analytics', pathname)}
                   />
                 </List>
               }
