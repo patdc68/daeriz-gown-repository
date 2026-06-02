@@ -5,9 +5,6 @@ import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
-import Avatar from '@mui/material/Avatar';
-import Dialog from '@mui/material/Dialog';
-import DialogContent from '@mui/material/DialogContent';
 import {
   DataGrid,
   type GridColDef,
@@ -18,7 +15,7 @@ import AddIcon from '@mui/icons-material/Add';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import PageContainer from './PageContainer';
 import { getItemsWithBranch } from '../services/getItems';
 import type { Item } from '../data/ItemType';
@@ -26,8 +23,8 @@ import useNotifications from '../hooks/useNotifications/useNotifications';
 import { useDialogs } from '../hooks/useDialogs/useDialogs';
 import { supabase } from '../services/supabase';
 import { useOutletContext } from 'react-router-dom';
+import { ImagePreviewDialog, ImageThumbnail } from './ImagePreview';
 
-const INITIAL_PAGE_SIZE = 5;
 
 interface DashboardUser {
   user: { name: string; role: string } | null;
@@ -37,19 +34,10 @@ export default function ItemList() {
   const { user } = useOutletContext<DashboardUser>();
   console.log('Logged in user:', user);
 
-  const { pathname } = useLocation();
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const dialogs = useDialogs();
   const notifications = useNotifications();
-
-  const [paginationModel, setPaginationModel] = React.useState({
-    page: searchParams.get('page') ? Number(searchParams.get('page')) : 0,
-    pageSize: searchParams.get('pageSize')
-      ? Number(searchParams.get('pageSize'))
-      : INITIAL_PAGE_SIZE,
-  });
 
 
   const [rowsState, setRowsState] = React.useState<{ rows: Item[]; rowCount: number }>({
@@ -60,9 +48,7 @@ export default function ItemList() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<Error | null>(null);
 
-  // Image popup
-  const [openImage, setOpenImage] = React.useState(false);
-  const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = React.useState<{ url: string; alt: string } | null>(null);
 
   const loadData = React.useCallback(async () => {
   setIsLoading(true);
@@ -158,10 +144,8 @@ export default function ItemList() {
     }
   };
 
-  const handleImageClick = (url: string | null) => {
-    if (!url) return;
-    setSelectedImage(url);
-    setOpenImage(true);
+  const handleImagePreview = (url: string, alt: string) => {
+    setSelectedImage({ url, alt });
   };
 
   const columns: GridColDef<Item>[] = [
@@ -170,16 +154,14 @@ export default function ItemList() {
       headerName: 'Image',
       width: 120,
       renderCell: (params) =>
-        params.row?.image_url ? (
-          <Avatar
-            variant="rounded"
-            src={params.row.image_url}
-            sx={{ width: 40, height: 40, cursor: 'pointer' }}
-            onClick={() => handleImageClick(params.row.image_url)}
-          />
-        ) : (
-          <span>N/A</span>
-        ),
+        <ImageThumbnail
+          src={params.row?.image_url}
+          alt={params.row?.item_name ?? 'Stock item'}
+          fallback="No image"
+          onPreview={handleImagePreview}
+          size={40}
+          variant="avatar"
+        />,
     },
     { field: 'item_name', headerName: 'Item Name', width: 180 },
 
@@ -273,12 +255,12 @@ export default function ItemList() {
           />
         )}
 
-        {/* Image preview dialog */}
-        <Dialog open={openImage} onClose={() => setOpenImage(false)} maxWidth="md">
-          <DialogContent>
-            {selectedImage && <img src={selectedImage} alt="preview" style={{ width: '100%' }} />}
-          </DialogContent>
-        </Dialog>
+        <ImagePreviewDialog
+          imageUrl={selectedImage?.url ?? null}
+          alt={selectedImage?.alt ?? 'Stock item'}
+          title="Stock image preview"
+          onClose={() => setSelectedImage(null)}
+        />
       </Box>
     </PageContainer>
   );
