@@ -10,6 +10,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import RentalPage from './components/RentalPage'
 import RentalCreate from './components/RentalCreate';
 import RentalHistory from './components/RentalHistory';
+import RentalInLaundry from './components/RentalInLaundry';
+import RentalShopReturn from './components/RentalShopReturn';
 import FittingPage from './components/Fittingpage';
 import NotificationsProvider from './hooks/useNotifications/NotificationsProvider';
 import DialogsProvider from './hooks/useDialogs/DialogsProvider';
@@ -58,6 +60,14 @@ const router = createHashRouter([
           {
             path: '/rentals/create',
             Component: RentalCreate,
+          },
+          {
+            path: '/reports/in-laundry',
+            Component: RentalInLaundry,
+          },
+          {
+            path: '/reports/shop-return',
+            Component: RentalShopReturn,
           },
           {
             path: '/reports/history',

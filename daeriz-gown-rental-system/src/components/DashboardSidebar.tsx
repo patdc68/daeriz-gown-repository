@@ -168,6 +168,20 @@ export default function DashboardSidebar({
                     selected={!!matchPath('/reports/rentals', pathname)}
                   />
                   <DashboardSidebarPageItem
+                    id="in-laundry"
+                    title="In Laundry"
+                    icon={<DescriptionIcon />}
+                    href="/reports/in-laundry"
+                    selected={!!matchPath('/reports/in-laundry', pathname)}
+                  />
+                  <DashboardSidebarPageItem
+                    id="shop-return"
+                    title="Shop Return"
+                    icon={<DescriptionIcon />}
+                    href="/reports/shop-return"
+                    selected={!!matchPath('/reports/shop-return', pathname)}
+                  />
+                  <DashboardSidebarPageItem
                     id="traffic"
                     title="History"
                     icon={<DescriptionIcon />}
