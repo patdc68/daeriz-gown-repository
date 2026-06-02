@@ -25,7 +25,8 @@ import {
 } from '../services/RentalAnalyticsService';
 import { ImagePreviewDialog, ImageThumbnail } from './ImagePreview';
 
-const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
+const formatPercentage = (value: number) => `${Number(value.toFixed(2))}%`;
+const rankLabel = (rank: number) => `Top ${rank}`;
 
 interface BarDatum {
   key: string;
@@ -56,6 +57,55 @@ function BarChart({ data, ariaLabel }: { data: BarDatum[]; ariaLabel: string }) 
             </Typography>
           </Stack>
         </Tooltip>
+      ))}
+    </Box>
+  );
+}
+
+interface RankedItemDatum extends BarDatum {
+  branchId: string;
+  branchName: string;
+  rank: number;
+  itemName: string;
+}
+
+function RankedItemsBarChart({ data }: { data: RankedItemDatum[] }) {
+  const maximum = Math.max(...data.map((item) => item.value), 1);
+  const groupedBranches = new Map<string, RankedItemDatum[]>();
+  data.forEach((item) => {
+    groupedBranches.set(item.branchId, [...(groupedBranches.get(item.branchId) ?? []), item]);
+  });
+  const branches = Array.from(groupedBranches);
+
+  return (
+    <Box role="img" aria-label="Grouped bar chart showing the top 3 most rented items per branch" sx={{ display: 'flex', gap: 2, alignItems: 'end', height: 280, mt: 3, mb: 2, overflowX: 'auto' }}>
+      {branches.map(([branchId, items]) => (
+        <Stack key={branchId} alignItems="center" justifyContent="flex-end" spacing={0.75} sx={{ flex: 1, height: '100%', minWidth: 168 }}>
+          <Stack direction="row" alignItems="flex-end" justifyContent="center" spacing={0.75} sx={{ flex: 1, width: '100%' }}>
+            {items.map((item) => (
+              <Tooltip key={item.key} title={item.tooltip} arrow>
+                <Stack alignItems="center" justifyContent="flex-end" spacing={0.5} sx={{ flex: 1, height: '100%', minWidth: 48 }}>
+                  <Typography variant="caption" fontWeight={700}>{item.value}</Typography>
+                  <Box
+                    sx={{
+                      width: 'min(100%, 48px)',
+                      height: `${Math.max((item.value / maximum) * 170, 8)}px`,
+                      bgcolor: 'text.primary',
+                      borderRadius: '6px 6px 0 0',
+                    }}
+                  />
+                  <Typography variant="caption" fontWeight={700}>{rankLabel(item.rank)}</Typography>
+                  <Typography variant="caption" textAlign="center" title={item.itemName} noWrap sx={{ maxWidth: 64 }}>
+                    {item.itemName}
+                  </Typography>
+                </Stack>
+              </Tooltip>
+            ))}
+          </Stack>
+          <Typography variant="caption" textAlign="center" sx={{ lineHeight: 1.1, minHeight: 28 }}>
+            {items[0].branchName}
+          </Typography>
+        </Stack>
       ))}
     </Box>
   );
@@ -138,22 +188,26 @@ export default function RentalAnalyticsPage() {
             </TableContainer>
           </AnalyticsCard>
 
-          <AnalyticsCard title="Most Rented Item per Branch" subtitle={dateRange.label}>
-            <BarChart
-              ariaLabel="Bar chart showing the most rented item per branch"
-              data={analytics.topItems.map((item) => ({
-                key: item.branchId,
+          <AnalyticsCard title="Top 3 Most Rented Items per Branch" subtitle={dateRange.label}>
+            <RankedItemsBarChart
+              data={analytics.topRentedItems.map((item) => ({
+                key: `${item.branchId}-${item.itemId}`,
+                branchId: item.branchId,
+                branchName: item.branchName,
+                rank: item.rank,
+                itemName: item.itemName,
                 label: item.branchName,
                 value: item.rentalCount,
-                tooltip: `${item.branchName}: ${item.itemName}, ${item.rentalCount} rentals (${formatPercentage(item.branchShare)} of branch rentals)`,
+                tooltip: `${item.branchName} · ${rankLabel(item.rank)} · ${item.itemName}: ${item.rentalCount} rentals (${formatPercentage(item.branchShare)} branch share)`,
               }))}
             />
             <TableContainer>
-              <Table size="small" aria-label="Most rented item per branch summary">
-                <TableHead><TableRow><TableCell>Branch</TableCell><TableCell>Most Rented Item</TableCell><TableCell align="right">Rentals</TableCell><TableCell align="right">Branch Share</TableCell></TableRow></TableHead>
-                <TableBody>{analytics.topItems.map((item) => (
-                  <TableRow key={item.branchId}>
+              <Table size="small" aria-label="Top 3 most rented items per branch summary">
+                <TableHead><TableRow><TableCell>Branch</TableCell><TableCell>Rank</TableCell><TableCell>Item</TableCell><TableCell align="right">Rentals</TableCell><TableCell align="right">Branch Share %</TableCell></TableRow></TableHead>
+                <TableBody>{analytics.topRentedItems.map((item) => (
+                  <TableRow key={`${item.branchId}-${item.itemId}`}>
                     <TableCell>{item.branchName}</TableCell>
+                    <TableCell>{rankLabel(item.rank)}</TableCell>
                     <TableCell><Stack direction="row" alignItems="center" spacing={1}><ImageThumbnail src={item.imageUrl} alt={item.itemName} fallback="No image" size={32} onPreview={(url, alt) => setSelectedImage({ url, alt })} /><span>{item.itemName}</span></Stack></TableCell>
                     <TableCell align="right">{item.rentalCount}</TableCell><TableCell align="right">{formatPercentage(item.branchShare)}</TableCell>
                   </TableRow>
