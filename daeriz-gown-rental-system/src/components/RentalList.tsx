@@ -3,9 +3,6 @@ import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import {
   Box,
   Button,
-  Dialog,
-  DialogContent,
-  DialogTitle,
   MenuItem,
   Select,
   Typography,
@@ -19,6 +16,7 @@ import {
   type RentalRecord,
   type RentalStatus,
 } from '../services/RentalService';
+import { ImagePreviewDialog, ImageThumbnail } from './ImagePreview';
 
 interface RentalListProps {
   status: RentalStatus;
@@ -26,38 +24,6 @@ interface RentalListProps {
   allowStatusUpdate?: boolean;
   showCreateButton?: boolean;
   showActualReturn?: boolean;
-}
-
-function Thumbnail({ src, alt }: { src?: string | null; alt: string }) {
-  if (!src) {
-    return (
-      <Box
-        sx={{
-          width: 48,
-          height: 48,
-          borderRadius: 1,
-          bgcolor: 'action.hover',
-          color: 'text.secondary',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 11,
-          textAlign: 'center',
-        }}
-      >
-        No image
-      </Box>
-    );
-  }
-
-  return (
-    <Box
-      component="img"
-      src={src}
-      alt={alt}
-      sx={{ width: 48, height: 48, borderRadius: 1, objectFit: 'cover' }}
-    />
-  );
 }
 
 export default function RentalList({
@@ -72,7 +38,7 @@ export default function RentalList({
   const [rows, setRows] = React.useState<RentalRecord[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [updatingRentalId, setUpdatingRentalId] = React.useState<string | null>(null);
-  const [receiptPreview, setReceiptPreview] = React.useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = React.useState<{ url: string; alt: string; title: string } | null>(null);
 
   const loadData = React.useCallback(async () => {
     setIsLoading(true);
@@ -114,7 +80,14 @@ export default function RentalList({
         width: 76,
         sortable: false,
         filterable: false,
-        renderCell: ({ row }) => <Thumbnail src={row.item?.image_url} alt={row.item?.item_name ?? 'Rental item'} />,
+        renderCell: ({ row }) => (
+          <ImageThumbnail
+            src={row.item?.image_url}
+            alt={row.item?.item_name ?? 'Rental item'}
+            fallback="No image"
+            onPreview={(url, alt) => setSelectedImage({ url, alt, title: 'Item image preview' })}
+          />
+        ),
       },
       {
         field: 'itemName',
@@ -138,15 +111,14 @@ export default function RentalList({
         width: 92,
         sortable: false,
         filterable: false,
-        renderCell: ({ row }) => row.receipt_img ? (
-          <Button
-            onClick={() => setReceiptPreview(row.receipt_img ?? null)}
-            sx={{ minWidth: 0, p: 0.5 }}
-            aria-label={`Preview receipt for ${row.renter_name}`}
-          >
-            <Thumbnail src={row.receipt_img} alt={`Receipt for ${row.renter_name}`} />
-          </Button>
-        ) : <Typography variant="caption" color="text.secondary">No receipt</Typography>,
+        renderCell: ({ row }) => (
+          <ImageThumbnail
+            src={row.receipt_img}
+            alt={`receipt for ${row.renter_name}`}
+            fallback="No receipt"
+            onPreview={(url, alt) => setSelectedImage({ url, alt, title: 'Receipt image preview' })}
+          />
+        ),
       },
     ];
 
@@ -198,19 +170,12 @@ export default function RentalList({
         autoHeight
       />
 
-      <Dialog open={Boolean(receiptPreview)} onClose={() => setReceiptPreview(null)} maxWidth="md">
-        <DialogTitle>Receipt Image</DialogTitle>
-        <DialogContent>
-          {receiptPreview && (
-            <Box
-              component="img"
-              src={receiptPreview}
-              alt="Rental receipt preview"
-              sx={{ display: 'block', maxWidth: '100%', maxHeight: '75vh', objectFit: 'contain' }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <ImagePreviewDialog
+        imageUrl={selectedImage?.url ?? null}
+        alt={selectedImage?.alt ?? 'Rental image'}
+        title={selectedImage?.title}
+        onClose={() => setSelectedImage(null)}
+      />
     </Box>
   );
 }

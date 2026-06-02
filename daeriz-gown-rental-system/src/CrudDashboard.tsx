@@ -12,6 +12,7 @@ import RentalCreate from './components/RentalCreate';
 import RentalHistory from './components/RentalHistory';
 import RentalInLaundry from './components/RentalInLaundry';
 import RentalShopReturn from './components/RentalShopReturn';
+import RentalAnalytics from './components/RentalAnalytics';
 import FittingPage from './components/Fittingpage';
 import NotificationsProvider from './hooks/useNotifications/NotificationsProvider';
 import DialogsProvider from './hooks/useDialogs/DialogsProvider';
@@ -72,6 +73,10 @@ const router = createHashRouter([
           {
             path: '/reports/history',
             Component: RentalHistory,
+          },
+          {
+            path: '/reports/analytics',
+            Component: RentalAnalytics,
           },
           {
             path: '/fittings',
