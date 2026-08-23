@@ -1,5 +1,5 @@
 import CssBaseline from '@mui/material/CssBaseline';
-import { createHashRouter, RouterProvider } from 'react-router-dom';
+import { createHashRouter, Navigate, RouterProvider } from 'react-router-dom';
 import DashboardLayout from './components/DashboardLayout';
 import ItemList from './components/ItemList';
 import ItemEdit from './components/ItemEdit';
@@ -13,7 +13,6 @@ import RentalHistory from './components/RentalHistory';
 import RentalInLaundry from './components/RentalInLaundry';
 import RentalShopReturn from './components/RentalShopReturn';
 import RentalAnalytics from './components/RentalAnalytics';
-import FittingPage from './components/Fittingpage';
 import NotificationsProvider from './hooks/useNotifications/NotificationsProvider';
 import DialogsProvider from './hooks/useDialogs/DialogsProvider';
 import AppTheme from './theme/AppTheme';
@@ -79,9 +78,10 @@ const router = createHashRouter([
             Component: RentalAnalytics,
           },
           {
-            path: '/fittings',
-            Component: FittingPage,
+            path: '/bookings',
+            lazy: async () => ({ Component: (await import('./components/BookingSchedule')).default }),
           },
+          { path: '/fittings', element: <Navigate to="/bookings" replace /> },
           {
             path: '*',
             Component: ItemList,

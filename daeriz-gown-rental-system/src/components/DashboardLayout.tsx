@@ -13,13 +13,10 @@ import { supabase } from '../services/supabase';
 export default function DashboardLayout() {
   const navigate = useNavigate();
   const [user, setUser] = React.useState<{ name: string; role: string } | null>(null);
-  const [loadingUser, setLoadingUser] = React.useState(true);
 
   // Fetch user info from DBLG_USERS
   React.useEffect(() => {
     const fetchUser = async () => {
-      setLoadingUser(true);
-
       const sessionResult = await supabase.auth.getSession();
       const userId = sessionResult.data.session?.user.id;
 
@@ -44,7 +41,6 @@ export default function DashboardLayout() {
         setUser({ name: data.name, role: data.role });
       }
 
-      setLoadingUser(false);
     };
 
     fetchUser();
@@ -87,11 +83,11 @@ export default function DashboardLayout() {
     [setIsNavigationExpanded]
   );
 
-  const layoutRef = React.useRef<HTMLDivElement>(null);
+  const [layoutElement, setLayoutElement] = React.useState<HTMLDivElement | null>(null);
 
   return (
     <Box
-      ref={layoutRef}
+      ref={setLayoutElement}
       sx={{
         position: 'relative',
         display: 'flex',
@@ -112,7 +108,7 @@ export default function DashboardLayout() {
       <DashboardSidebar
         expanded={isNavigationExpanded}
         setExpanded={setIsNavigationExpanded}
-        container={layoutRef?.current ?? undefined}
+        container={layoutElement ?? undefined}
       />
 
       <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
