@@ -1,162 +1,69 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../services/supabase';
-import {
-  Box,
-  Paper,
-  TextField,
-  Button,
-  MenuItem,
-  Typography,
-} from '@mui/material';
+import * as React from 'react';
+import { Alert, Box, Button, CircularProgress, MenuItem, Paper, TextField, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../services/supabase';
 
 export default function Register() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [role, setRole] = useState('staff');
-  const [branchId, setBranchId] = useState<string | null>(null);
-  const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [name, setName] = React.useState('');
+  const [branchId, setBranchId] = React.useState('');
+  const [branches, setBranches] = React.useState<{ id: string; name: string }[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [message, setMessage] = React.useState<{ severity: 'error' | 'success'; text: string } | null>(null);
 
-  // fetch branches
-  useEffect(() => {
-    const fetchBranches = async () => {
-      const { data, error } = await supabase
-        .from('DBLG_SHOP_BRANCH')
-        .select('id, name')
-        .order('name', { ascending: true });
-
-      if (error) {
-        console.error('Failed to fetch branches:', error.message);
-        return;
-      }
-      if (data) setBranches(data);
-    };
-
-    fetchBranches();
+  React.useEffect(() => {
+    supabase.from('DBLG_SHOP_BRANCH').select('id, name').order('name').then(({ data, error }) => {
+      if (error) setMessage({ severity: 'error', text: 'Unable to load shop branches.' });
+      else setBranches(data ?? []);
+    });
   }, []);
 
-  const handleRegister = async () => {
-    if (loading) return; // prevent double click
-
-    if (!email || !password || !name || !branchId) {
-      alert('Please fill all fields');
+  const handleRegister = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (loading) return;
+    setMessage(null);
+    if (!email || !password || !name.trim() || !branchId) {
+      setMessage({ severity: 'error', text: 'Please fill in all required fields.' });
       return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
-
-      // 1️⃣ Create user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
+        options: { data: { name: name.trim(), branch_id: branchId } },
       });
-
-      if (authError) {
-        alert(authError.message);
-        return;
-      }
-
-      if (!authData.user?.id) {
-        alert('Failed to create user.');
-        return;
-      }
-
-      // 2️⃣ Update the DBLG_USERS row created by the trigger
-      const { data: updatedData, error } = await supabase
-        .from('DBLG_USERS')
-        .update({
-          name,
-          role,
-          branch_id: branchId,
-        })
-        .eq('auth_user_id', authData.user.id)
-        .select();
-
       if (error) {
-        alert(error.message);
+        setMessage({ severity: 'error', text: error.message });
         return;
       }
-
-      console.log('Updated row in DB:', updatedData);
-
-      alert('User created successfully!');
-      navigate('/login');
+      setMessage({ severity: 'success', text: 'Account created. Check your email if confirmation is required.' });
+      setTimeout(() => navigate('/login'), 900);
+    } catch (error) {
+      console.error('Registration failed:', error);
+      setMessage({ severity: 'error', text: 'Unable to create the account.' });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
-      <Paper sx={{ p: 4, width: 400 }}>
-        <Typography variant="h5" mb={2}>
-          Register New User
-        </Typography>
-
-        <TextField
-          fullWidth
-          label="Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          margin="normal"
-        />
-
-        <TextField
-          fullWidth
-          label="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          margin="normal"
-        />
-
-        <TextField
-          fullWidth
-          label="Password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          margin="normal"
-        />
-
-        <TextField
-          select
-          fullWidth
-          label="Role"
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          margin="normal"
-        >
-          <MenuItem value="staff">Staff</MenuItem>
-          <MenuItem value="admin">Admin</MenuItem>
+    <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh" p={2}>
+      <Paper component="form" onSubmit={handleRegister} sx={{ p: { xs: 3, sm: 4 }, width: '100%', maxWidth: 420 }}>
+        <Typography variant="h5" mb={2}>Register New User</Typography>
+        {message && <Alert severity={message.severity} sx={{ mb: 1 }}>{message.text}</Alert>}
+        <TextField required fullWidth label="Name" value={name} onChange={(event) => setName(event.target.value)} margin="normal" autoComplete="name" />
+        <TextField required fullWidth label="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} margin="normal" autoComplete="email" />
+        <TextField required fullWidth label="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} margin="normal" autoComplete="new-password" />
+        <TextField select required fullWidth label="Branch" value={branchId} onChange={(event) => setBranchId(event.target.value)} margin="normal">
+          {branches.map((branch) => <MenuItem key={branch.id} value={branch.id}>{branch.name}</MenuItem>)}
         </TextField>
-
-        <TextField
-          select
-          fullWidth
-          label="Branch"
-          value={branchId ?? ''}
-          onChange={(e) => setBranchId(e.target.value)}
-          margin="normal"
-        >
-          {branches.map((b) => (
-            <MenuItem key={b.id} value={b.id}>
-              {b.name}
-            </MenuItem>
-          ))}
-        </TextField>
-
-        <Button
-          fullWidth
-          variant="contained"
-          sx={{ mt: 2 }}
-          onClick={handleRegister}
-          disabled={loading}
-        >
-          {loading ? 'Registering...' : 'Register'}
+        <Alert severity="info" sx={{ mt: 2 }}>New accounts are created with staff access. An administrator can change access when needed.</Alert>
+        <Button type="submit" fullWidth variant="contained" sx={{ mt: 2 }} disabled={loading}>
+          {loading ? <CircularProgress size={22} color="inherit" /> : 'Register'}
         </Button>
       </Paper>
     </Box>

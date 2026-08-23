@@ -9,7 +9,7 @@ import type {} from '@mui/material/themeCssVarsAugmentation';
 import ArticleIcon from '@mui/icons-material/Article';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import DescriptionIcon from '@mui/icons-material/Description';
-import LayersIcon from '@mui/icons-material/Layers';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { matchPath, useLocation } from 'react-router';
 import DashboardSidebarContext from '../context/DashboardSidebarContext';
 import { DRAWER_WIDTH, MINI_DRAWER_WIDTH } from '../Constant';
@@ -39,7 +39,7 @@ export default function DashboardSidebar({
   const { pathname } = useLocation();
 
   const [expandedItemIds, setExpandedItemIds] = React.useState<string[]>(() =>
-    matchPath('/reports/*', pathname) ? ['reports'] : [],
+    matchPath('/reports/*', pathname) || matchPath('/bookings', pathname) ? ['rentals'] : [],
   );
 
   const isOverSmViewport = useMediaQuery(theme.breakpoints.up('sm'));
@@ -134,7 +134,7 @@ export default function DashboardSidebar({
               width: mini ? MINI_DRAWER_WIDTH : 'auto',
             }}
           >
-            <DashboardSidebarHeaderItem>Main items</DashboardSidebarHeaderItem>
+            <DashboardSidebarHeaderItem>Inventory</DashboardSidebarHeaderItem>
             <DashboardSidebarPageItem
               id="employees"
               title="Stocks"
@@ -143,15 +143,15 @@ export default function DashboardSidebar({
               selected={!!matchPath('/itemList/*', pathname) || pathname === '/'}
             />
             <DashboardSidebarDividerItem />
-            <DashboardSidebarHeaderItem>Others</DashboardSidebarHeaderItem>
+            <DashboardSidebarHeaderItem>Rentals</DashboardSidebarHeaderItem>
             <DashboardSidebarPageItem
-              id="reports"
-              title="Reports"
-              icon={<BarChartIcon />}
-              href="/reports"
-              selected={!!matchPath('/reports/*', pathname)}
-              defaultExpanded={!!matchPath('/reports/*', pathname)}
-              expanded={expandedItemIds.includes('reports')}
+              id="rentals"
+              title="Rental Operations"
+              icon={<DescriptionIcon />}
+              href="/reports/rentals"
+              selected={Boolean(matchPath('/reports/rentals', pathname) || matchPath('/reports/in-laundry', pathname) || matchPath('/reports/shop-return', pathname) || matchPath('/reports/history', pathname) || matchPath('/bookings', pathname))}
+              defaultExpanded={Boolean(matchPath('/reports/*', pathname) || matchPath('/bookings', pathname))}
+              expanded={expandedItemIds.includes('rentals')}
               nestedNavigation={
                 <List
                   dense
@@ -164,10 +164,17 @@ export default function DashboardSidebar({
                 >
                   <DashboardSidebarPageItem
                     id="sales"
-                    title="Rentals"
+                    title="Active Rentals"
                     icon={<DescriptionIcon />}
                     href="/reports/rentals"
                     selected={!!matchPath('/reports/rentals', pathname)}
+                  />
+                  <DashboardSidebarPageItem
+                    id="bookings"
+                    title="Booking Schedule"
+                    icon={<CalendarMonthIcon />}
+                    href="/bookings"
+                    selected={!!matchPath('/bookings', pathname)}
                   />
                   <DashboardSidebarPageItem
                     id="in-laundry"
@@ -190,22 +197,17 @@ export default function DashboardSidebar({
                     href="/reports/history"
                     selected={!!matchPath('/reports/history', pathname)}
                   />
-                  <DashboardSidebarPageItem
-                    id="analytics"
-                    title="Analytics"
-                    icon={<BarChartIcon />}
-                    href="/reports/analytics"
-                    selected={!!matchPath('/reports/analytics', pathname)}
-                  />
                 </List>
               }
             />
+            <DashboardSidebarDividerItem />
+            <DashboardSidebarHeaderItem>Reports</DashboardSidebarHeaderItem>
             <DashboardSidebarPageItem
-              id="integrations"
-              title="Fittings Schedule"
-              icon={<LayersIcon />}
-              href="/fittings"
-              selected={!!matchPath('/fittings', pathname)}
+              id="analytics"
+              title="Analytics"
+              icon={<BarChartIcon />}
+              href="/reports/analytics"
+              selected={!!matchPath('/reports/analytics', pathname)}
             />
           </List>
         </Box>

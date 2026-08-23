@@ -1,145 +1,138 @@
+import dayjs from 'dayjs';
 import { supabase } from './supabase';
 
 export const RENTAL_STATUSES = {
-    RENTING: 'Renting',
-    IN_LAUNDRY: 'In Laundry',
-    SHOP_RETURN: 'Shop Return',
-    COMPLETED: 'Completed',
+  RENTING: 'Renting',
+  IN_LAUNDRY: 'In Laundry',
+  SHOP_RETURN: 'Shop Return',
+  COMPLETED: 'Completed',
 } as const;
 
 export type RentalStatus = typeof RENTAL_STATUSES[keyof typeof RENTAL_STATUSES];
-
 export const RENTAL_STATUS_OPTIONS = Object.values(RENTAL_STATUSES);
 
 export interface CreateRentalValues {
-    branch_id: string;
-    item_rented_id: string;
-    date_rented: string;
-    date_returned: string;
-    renter_name: string;
-    renter_contact_no: string;
-    receipt_img?: string;
+  branch_id: string;
+  item_rented_id: string;
+  date_rented: string;
+  date_returned: string;
+  renter_name: string;
+  renter_contact_no: string;
+  receipt_img?: string;
 }
 
 export interface RentalRecord extends CreateRentalValues {
-    id: string;
-    status: RentalStatus;
-    actual_returned_date?: string | null;
-    item?: {
-        item_name?: string | null;
-        avail_qty?: number | null;
-        image_url?: string | null;
-    } | null;
-    branch?: {
-        name?: string | null;
-    } | null;
+  id: string;
+  created_at?: string;
+  status: RentalStatus;
+  actual_returned_date?: string | null;
+  item?: {
+    id?: string;
+    item_name?: string | null;
+    category?: string | null;
+    size?: string | null;
+    avail_qty?: number | null;
+    total_qty?: number | null;
+    image_url?: string | null;
+  } | null;
+  branch?: { id?: string; name?: string | null; location?: string | null } | null;
 }
 
 const rentalSelect = `
-    *,
-    item:DBLG_ITEMS(item_name, avail_qty, image_url),
-    branch:branch_id(name)
+  *,
+  item:DBLG_ITEMS!DBLG_RENTALS_item_rented_id_fkey(
+    id, item_name, category, size, avail_qty, total_qty, image_url
+  ),
+  branch:DBLG_SHOP_BRANCH!DBLG_RENTALS_branch_id_fkey(id, name, location)
 `;
 
-export async function getRentalsByStatus(status: RentalStatus) {
-    const { data, error } = await supabase
-        .from('DBLG_RENTALS')
-        .select(rentalSelect)
-        .eq('status', status);
+function validateRental(values: CreateRentalValues) {
+  if (!values.branch_id || !values.item_rented_id) {
+    throw new Error('Branch and item are required.');
+  }
+  if (!values.renter_name.trim() || !values.renter_contact_no.trim()) {
+    throw new Error('Renter name and contact number are required.');
+  }
+  if (!values.date_rented || !values.date_returned) {
+    throw new Error('Rental date and return date are required.');
+  }
+  if (!dayjs(values.date_rented, 'YYYY-MM-DD', true).isValid()
+    || !dayjs(values.date_returned, 'YYYY-MM-DD', true).isValid()) {
+    throw new Error('Enter valid rental and return dates.');
+  }
+  if (dayjs(values.date_returned).isBefore(dayjs(values.date_rented), 'day')) {
+    throw new Error('Return date cannot be before rental date.');
+  }
+}
 
-    if (error) throw error;
-    return (data ?? []) as RentalRecord[];
+export function getRentalErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes('fully booked')) {
+    return 'The selected item is already fully booked for these dates.';
+  }
+  if (message.includes('does not belong')) return message;
+  if (message.includes('required') || message.includes('cannot be before')) return message;
+  return 'Unable to save the rental. Please try again.';
+}
+
+export async function getRentalsByStatus(status: RentalStatus) {
+  const { data, error } = await supabase
+    .from('DBLG_RENTALS')
+    .select(rentalSelect)
+    .eq('status', status)
+    .order('date_rented', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as RentalRecord[];
 }
 
 export async function uploadRentalReceipt(file: File) {
-    if (!file.type.startsWith('image/')) {
-        throw new Error('Receipt image must be an image file.');
-    }
+  if (!file.type.startsWith('image/')) throw new Error('Receipt image must be an image file.');
+  if (file.size > 5 * 1024 * 1024) throw new Error('Receipt image must be 5 MB or smaller.');
 
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-');
-    const filePath = `rental-receipts/${Date.now()}-${safeName}`;
-    const { error: uploadError } = await supabase.storage
-        .from('item-images')
-        .upload(filePath, file);
-
-    if (uploadError) throw uploadError;
-
-    const { data } = supabase.storage
-        .from('item-images')
-        .getPublicUrl(filePath);
-
-    return data.publicUrl;
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+  const filePath = `rental-receipts/${crypto.randomUUID()}-${safeName}`;
+  const { error } = await supabase.storage.from('item-images').upload(filePath, file);
+  if (error) throw error;
+  return supabase.storage.from('item-images').getPublicUrl(filePath).data.publicUrl;
 }
 
 export async function createRental(values: CreateRentalValues) {
-    const { data: item, error: itemError } = await supabase
-        .from('DBLG_ITEMS')
-        .select('avail_qty')
-        .eq('id', values.item_rented_id)
-        .single();
+  validateRental(values);
+  const { data, error } = await supabase.rpc('create_rental', {
+    p_branch_id: values.branch_id,
+    p_item_rented_id: values.item_rented_id,
+    p_date_rented: values.date_rented,
+    p_date_returned: values.date_returned,
+    p_renter_name: values.renter_name.trim(),
+    p_renter_contact_no: values.renter_contact_no.trim(),
+    p_receipt_img: values.receipt_img ?? null,
+  });
+  if (error) throw error;
+  return data as RentalRecord;
+}
 
-    if (itemError) throw itemError;
-    if (!item || item.avail_qty <= 0) {
-        throw new Error('Item not available');
-    }
-
-    const { error: quantityError } = await supabase
-        .from('DBLG_ITEMS')
-        .update({ avail_qty: item.avail_qty - 1 })
-        .eq('id', values.item_rented_id);
-
-    if (quantityError) throw quantityError;
-
-    const { error: rentalError } = await supabase
-        .from('DBLG_RENTALS')
-        .insert({
-            ...values,
-            status: RENTAL_STATUSES.RENTING,
-        });
-
-    if (rentalError) {
-        await supabase
-            .from('DBLG_ITEMS')
-            .update({ avail_qty: item.avail_qty })
-            .eq('id', values.item_rented_id);
-        throw rentalError;
-    }
+export async function updateRental(values: RentalRecord) {
+  validateRental(values);
+  const { data, error } = await supabase.rpc('update_rental', {
+    p_rental_id: values.id,
+    p_branch_id: values.branch_id,
+    p_item_rented_id: values.item_rented_id,
+    p_date_rented: values.date_rented,
+    p_date_returned: values.date_returned,
+    p_renter_name: values.renter_name.trim(),
+    p_renter_contact_no: values.renter_contact_no.trim(),
+    p_receipt_img: values.receipt_img ?? null,
+  });
+  if (error) throw error;
+  return data as RentalRecord;
 }
 
 export async function updateRentalStatus(row: RentalRecord, newStatus: RentalStatus) {
-    if (!RENTAL_STATUS_OPTIONS.includes(newStatus)) {
-        throw new Error('Invalid rental status');
-    }
-
-    const localDate = new Date();
-    const offset = localDate.getTimezoneOffset() * 60000;
-    const localIso = new Date(localDate.getTime() - offset).toISOString().slice(0, -1);
-    const { error: rentalError } = await supabase
-        .from('DBLG_RENTALS')
-        .update({
-            status: newStatus,
-            actual_returned_date:
-                newStatus === RENTAL_STATUSES.COMPLETED ? localIso : null,
-        })
-        .eq('id', row.id);
-
-    if (rentalError) throw rentalError;
-
-    if (newStatus === RENTAL_STATUSES.COMPLETED && row.status !== RENTAL_STATUSES.COMPLETED) {
-        const { data: item, error } = await supabase
-            .from('DBLG_ITEMS')
-            .select('avail_qty')
-            .eq('id', row.item_rented_id)
-            .single();
-
-        if (error) throw error;
-        if (!item) throw new Error('Item not found');
-
-        const { error: quantityError } = await supabase
-            .from('DBLG_ITEMS')
-            .update({ avail_qty: item.avail_qty + 1 })
-            .eq('id', row.item_rented_id);
-
-        if (quantityError) throw quantityError;
-    }
+  if (!RENTAL_STATUS_OPTIONS.includes(newStatus)) throw new Error('Invalid rental status.');
+  const { data, error } = await supabase.rpc('update_rental_status', {
+    p_rental_id: row.id,
+    p_status: newStatus,
+  });
+  if (error) throw error;
+  return data as RentalRecord;
 }

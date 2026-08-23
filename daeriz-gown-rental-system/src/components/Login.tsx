@@ -31,17 +31,19 @@ export default function Login() {
     }, [navigate]);
 
     const handleLogin = async () => {
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
-
-        if (error) {
-            alert(error.message);
-            return;
+        if (loading) return;
+        setError('');
+        setLoading(true);
+        try {
+            const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+            if (loginError) {
+                setError('Unable to sign in. Check your email and password.');
+                return;
+            }
+            navigate('/itemList');
+        } finally {
+            setLoading(false);
         }
-
-        navigate('/itemList');
     };
 
     return (
@@ -71,6 +73,7 @@ export default function Login() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     margin="normal"
+                    autoComplete="email"
                 />
 
                 <TextField
@@ -80,6 +83,7 @@ export default function Login() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     margin="normal"
+                    autoComplete="current-password"
                 />
 
                 <Button
