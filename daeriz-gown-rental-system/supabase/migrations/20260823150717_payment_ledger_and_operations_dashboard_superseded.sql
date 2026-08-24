@@ -1,0 +1,5 @@
+-- Superseded before deployment by the narrowly scoped runtime reconciliation
+-- migrations dated 20260823150250 through 20260823150316.
+--
+-- Keeping this version as a no-op preserves migration ordering while avoiding
+-- the unsafe dependency on the rejected all-in-one booking/security draft.

@@ -18,7 +18,9 @@ export interface CreateRentalValues {
   date_returned: string;
   renter_name: string;
   renter_contact_no: string;
-  receipt_img?: string;
+  rental_amount: number;
+  security_deposit_amount: number;
+  discount_amount: number;
 }
 
 export interface RentalRecord extends CreateRentalValues {
@@ -26,6 +28,7 @@ export interface RentalRecord extends CreateRentalValues {
   created_at?: string;
   status: RentalStatus;
   actual_returned_date?: string | null;
+  receipt_img?: string | null;
   item?: {
     id?: string;
     item_name?: string | null;
@@ -36,6 +39,15 @@ export interface RentalRecord extends CreateRentalValues {
     image_url?: string | null;
   } | null;
   branch?: { id?: string; name?: string | null; location?: string | null } | null;
+}
+
+export interface RentalHistoryRecord {
+  id: string;
+  rental_id: string;
+  processed_by_id: string | null;
+  action: string | null;
+  notes: string | null;
+  created_at: string;
 }
 
 const rentalSelect = `
@@ -63,6 +75,11 @@ function validateRental(values: CreateRentalValues) {
   if (dayjs(values.date_returned).isBefore(dayjs(values.date_rented), 'day')) {
     throw new Error('Return date cannot be before rental date.');
   }
+  if ([values.rental_amount, values.security_deposit_amount, values.discount_amount]
+    .some((amount) => !Number.isFinite(Number(amount)) || Number(amount) < 0)
+    || values.discount_amount > values.rental_amount) {
+    throw new Error('Enter valid non-negative rental, deposit, and discount amounts.');
+  }
 }
 
 export function getRentalErrorMessage(error: unknown) {
@@ -85,15 +102,14 @@ export async function getRentalsByStatus(status: RentalStatus) {
   return (data ?? []) as RentalRecord[];
 }
 
-export async function uploadRentalReceipt(file: File) {
-  if (!file.type.startsWith('image/')) throw new Error('Receipt image must be an image file.');
-  if (file.size > 5 * 1024 * 1024) throw new Error('Receipt image must be 5 MB or smaller.');
-
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-');
-  const filePath = `rental-receipts/${crypto.randomUUID()}-${safeName}`;
-  const { error } = await supabase.storage.from('item-images').upload(filePath, file);
+export async function getRentalHistory(rentalId: string): Promise<RentalHistoryRecord[]> {
+  const { data, error } = await supabase
+    .from('DBLG_RENTAL_HISTORY')
+    .select('id, rental_id, processed_by_id, action, notes, created_at')
+    .eq('rental_id', rentalId)
+    .order('created_at', { ascending: false });
   if (error) throw error;
-  return supabase.storage.from('item-images').getPublicUrl(filePath).data.publicUrl;
+  return (data ?? []) as RentalHistoryRecord[];
 }
 
 export async function createRental(values: CreateRentalValues) {
@@ -105,7 +121,9 @@ export async function createRental(values: CreateRentalValues) {
     p_date_returned: values.date_returned,
     p_renter_name: values.renter_name.trim(),
     p_renter_contact_no: values.renter_contact_no.trim(),
-    p_receipt_img: values.receipt_img ?? null,
+    p_rental_amount: values.rental_amount,
+    p_security_deposit_amount: values.security_deposit_amount,
+    p_discount_amount: values.discount_amount,
   });
   if (error) throw error;
   return data as RentalRecord;
@@ -121,7 +139,9 @@ export async function updateRental(values: RentalRecord) {
     p_date_returned: values.date_returned,
     p_renter_name: values.renter_name.trim(),
     p_renter_contact_no: values.renter_contact_no.trim(),
-    p_receipt_img: values.receipt_img ?? null,
+    p_rental_amount: values.rental_amount,
+    p_security_deposit_amount: values.security_deposit_amount,
+    p_discount_amount: values.discount_amount,
   });
   if (error) throw error;
   return data as RentalRecord;

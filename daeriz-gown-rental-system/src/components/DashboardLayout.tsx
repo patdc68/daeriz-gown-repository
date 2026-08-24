@@ -10,9 +10,13 @@ import SitemarkIcon from './SitemarkIcon';
 import { supabase } from '../services/supabase';
 
 
+export interface DashboardOutletContext {
+  user: { name: string; role: string; branch_id: string } | null;
+}
+
 export default function DashboardLayout() {
   const navigate = useNavigate();
-  const [user, setUser] = React.useState<{ name: string; role: string } | null>(null);
+  const [user, setUser] = React.useState<DashboardOutletContext['user']>(null);
 
   // Fetch user info from DBLG_USERS
   React.useEffect(() => {
@@ -27,7 +31,7 @@ export default function DashboardLayout() {
 
       const { data, error } = await supabase
         .from('DBLG_USERS')
-        .select('name, role')
+        .select('name, role, branch_id')
         .eq('auth_user_id', userId)
         .single();
 
@@ -38,7 +42,7 @@ export default function DashboardLayout() {
       }
 
       if (data) {
-        setUser({ name: data.name, role: data.role });
+        setUser({ name: data.name, role: data.role, branch_id: data.branch_id });
       }
 
     };

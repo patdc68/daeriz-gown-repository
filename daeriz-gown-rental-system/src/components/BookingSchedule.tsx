@@ -9,13 +9,12 @@ import {
   Autocomplete,
   Avatar,
   Box,
+  Button,
   Chip,
   CircularProgress,
   Dialog,
-  DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   FormControl,
   Grid,
   InputLabel,
@@ -35,7 +34,7 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import IconButton from '@mui/material/IconButton';
 import { alpha, useTheme } from '@mui/material/styles';
 import PageContainer from './PageContainer';
-import { ImagePreviewDialog, ImageThumbnail } from './ImagePreview';
+import RentalDetailsDialog from './RentalDetailsDialog';
 import {
   getBookingOptions,
   getBookings,
@@ -48,7 +47,6 @@ import {
   RENTAL_STATUS_OPTIONS,
   type RentalStatus,
 } from '../services/RentalService';
-import useNotifications from '../hooks/useNotifications/useNotifications';
 
 const MAX_VISIBLE_ROWS = 3;
 
@@ -69,97 +67,8 @@ function bookingTooltip(booking: Booking) {
   ].join('\n');
 }
 
-function DetailRow({ label, value }: { label: string; value?: React.ReactNode }) {
-  return (
-    <Box>
-      <Typography variant="caption" color="text.secondary">{label}</Typography>
-      <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>{value || '—'}</Typography>
-    </Box>
-  );
-}
-
-function BookingDetailsDialog({
-  booking,
-  onClose,
-  onPreview,
-}: {
-  booking: Booking | null;
-  onClose: () => void;
-  onPreview: (url: string, alt: string, title: string) => void;
-}) {
-  return (
-    <Dialog open={Boolean(booking)} onClose={onClose} maxWidth="md" fullWidth fullScreen={false}>
-      <DialogTitle sx={{ pr: 7 }}>
-        Rental details
-        <IconButton aria-label="Close rental details" onClick={onClose} sx={{ position: 'absolute', right: 12, top: 12 }}>
-          <CloseRoundedIcon />
-        </IconButton>
-      </DialogTitle>
-      <DialogContent dividers>
-        {booking && (
-          <Stack spacing={3}>
-            <Box>
-              <Typography variant="overline" color="text.secondary">Renter</Typography>
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, sm: 6 }}><DetailRow label="Name" value={booking.renter_name} /></Grid>
-                <Grid size={{ xs: 12, sm: 6 }}><DetailRow label="Contact number" value={booking.renter_contact_no} /></Grid>
-              </Grid>
-            </Box>
-            <Divider />
-            <Box>
-              <Typography variant="overline" color="text.secondary">Item</Typography>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mt={1}>
-                <ImageThumbnail
-                  src={booking.item?.image_url}
-                  alt={booking.item?.item_name ?? 'Rental item'}
-                  size={96}
-                  fallback="No image"
-                  onPreview={(url, alt) => onPreview(url, alt, 'Item image')}
-                />
-                <Grid container spacing={2} flex={1}>
-                  <Grid size={{ xs: 12, sm: 4 }}><DetailRow label="Item name" value={booking.item?.item_name} /></Grid>
-                  <Grid size={{ xs: 6, sm: 4 }}><DetailRow label="Category" value={booking.item?.category} /></Grid>
-                  <Grid size={{ xs: 6, sm: 4 }}><DetailRow label="Size" value={booking.item?.size} /></Grid>
-                </Grid>
-              </Stack>
-            </Box>
-            <Divider />
-            <Box>
-              <Typography variant="overline" color="text.secondary">Booking</Typography>
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, sm: 6 }}><DetailRow label="Branch" value={booking.branch?.name} /></Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <DetailRow label="Status" value={<Chip size="small" label={booking.status} sx={{ color: statusStyles[booking.status].color, bgcolor: statusStyles[booking.status].background }} />} />
-                </Grid>
-                <Grid size={{ xs: 6, sm: 4 }}><DetailRow label="Rental date" value={dayjs(booking.date_rented).format('MMM D, YYYY')} /></Grid>
-                <Grid size={{ xs: 6, sm: 4 }}><DetailRow label="Expected return" value={dayjs(booking.date_returned).format('MMM D, YYYY')} /></Grid>
-                <Grid size={{ xs: 12, sm: 4 }}><DetailRow label="Actual return" value={booking.actual_returned_date ? dayjs(booking.actual_returned_date).format('MMM D, YYYY h:mm A') : undefined} /></Grid>
-              </Grid>
-            </Box>
-            <Divider />
-            <Box>
-              <Typography variant="overline" color="text.secondary">Payment</Typography>
-              <Box mt={1}>
-                <ImageThumbnail
-                  src={booking.receipt_img}
-                  alt={`Receipt for ${booking.renter_name}`}
-                  size={96}
-                  fallback="No receipt"
-                  onPreview={(url, alt) => onPreview(url, alt, 'Receipt image')}
-                />
-              </Box>
-            </Box>
-          </Stack>
-        )}
-      </DialogContent>
-      <DialogActions><Box component="button" hidden /></DialogActions>
-    </Dialog>
-  );
-}
-
 export default function BookingSchedule() {
   const theme = useTheme();
-  const notifications = useNotifications();
   const [bookings, setBookings] = React.useState<Booking[]>([]);
   const [branches, setBranches] = React.useState<BookingBranch[]>([]);
   const [items, setItems] = React.useState<BookingItem[]>([]);
@@ -168,32 +77,46 @@ export default function BookingSchedule() {
   const [status, setStatus] = React.useState<'all' | RentalStatus>('all');
   const [search, setSearch] = React.useState('');
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [optionsError, setOptionsError] = React.useState<string | null>(null);
+  const [bookingReloadKey, setBookingReloadKey] = React.useState(0);
+  const [optionsReloadKey, setOptionsReloadKey] = React.useState(0);
   const [selectedBooking, setSelectedBooking] = React.useState<Booking | null>(null);
   const [overflowDate, setOverflowDate] = React.useState<string | null>(null);
   const [visibleRange, setVisibleRange] = React.useState(() => ({
     start: dayjs().startOf('month').subtract(7, 'day').format('YYYY-MM-DD'),
     end: dayjs().endOf('month').add(7, 'day').format('YYYY-MM-DD'),
   }));
-  const [preview, setPreview] = React.useState<{ url: string; alt: string; title: string } | null>(null);
 
   React.useEffect(() => {
+    let active = true;
+    setOptionsError(null);
     getBookingOptions()
       .then(({ branches: branchRows, items: itemRows }) => {
+        if (!active) return;
         setBranches(branchRows);
         setItems(itemRows);
       })
-      .catch(() => notifications.show('Unable to load booking filters.', { severity: 'error' }));
-  }, [notifications]);
+      .catch(() => {
+        if (active) setOptionsError('Unable to load booking filters.');
+      });
+    return () => { active = false; };
+  }, [optionsReloadKey]);
 
   React.useEffect(() => {
     let active = true;
     setLoading(true);
+    setError(null);
     getBookings(visibleRange.start, visibleRange.end)
-      .then((rows) => { if (active) setBookings(rows); })
-      .catch(() => notifications.show('Unable to load bookings.', { severity: 'error' }))
+      .then((rows) => {
+        if (active) setBookings(rows);
+      })
+      .catch(() => {
+        if (active) setError('Unable to load bookings.');
+      })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [notifications, visibleRange]);
+  }, [bookingReloadKey, visibleRange]);
 
   const selectableItems = React.useMemo(
     () => branchId === 'all' ? items : items.filter((item) => item.branch_id === branchId),
@@ -235,7 +158,7 @@ export default function BookingSchedule() {
     return [...unique.values()];
   }, [filteredBookings, overflowDate]);
 
-  const noMatches = !loading && filteredBookings.length === 0;
+  const noMatches = !loading && !error && filteredBookings.length === 0;
 
   return (
     <PageContainer title="Booking Schedule" breadcrumbs={[{ title: 'Rentals' }, { title: 'Booking Schedule' }]}>
@@ -291,6 +214,16 @@ export default function BookingSchedule() {
           ))}
         </Stack>
 
+        {optionsError && (
+          <Alert severity="warning" action={<Button color="inherit" onClick={() => setOptionsReloadKey((key) => key + 1)}>Retry</Button>}>
+            {optionsError}
+          </Alert>
+        )}
+        {error && (
+          <Alert severity="error" action={<Button color="inherit" onClick={() => setBookingReloadKey((key) => key + 1)}>Retry</Button>}>
+            {error}
+          </Alert>
+        )}
         {loading && <Alert icon={<CircularProgress size={18} />} severity="info">Loading bookings...</Alert>}
         {noMatches && <Alert severity="info">{bookings.length ? 'No bookings match the selected filters.' : 'No bookings for this month.'}</Alert>}
 
@@ -337,10 +270,15 @@ export default function BookingSchedule() {
                 </Stack>
               )}
               moreLinkClick={(info) => { setOverflowDate(dayjs(info.date).format('YYYY-MM-DD')); }}
-              datesSet={(info) => setVisibleRange({
-                start: dayjs(info.start).format('YYYY-MM-DD'),
-                end: dayjs(info.end).subtract(1, 'day').format('YYYY-MM-DD'),
-              })}
+              datesSet={(info) => {
+                const nextStart = dayjs(info.start).format('YYYY-MM-DD');
+                const nextEnd = dayjs(info.end).subtract(1, 'day').format('YYYY-MM-DD');
+                setVisibleRange((current) => (
+                  current.start === nextStart && current.end === nextEnd
+                    ? current
+                    : { start: nextStart, end: nextEnd }
+                ));
+              }}
             />
           </Box>
         </Paper>
@@ -367,12 +305,7 @@ export default function BookingSchedule() {
         </DialogContent>
       </Dialog>
 
-      <BookingDetailsDialog
-        booking={selectedBooking}
-        onClose={() => setSelectedBooking(null)}
-        onPreview={(url, alt, title) => setPreview({ url, alt, title })}
-      />
-      <ImagePreviewDialog imageUrl={preview?.url ?? null} alt={preview?.alt ?? 'Booking image'} title={preview?.title} onClose={() => setPreview(null)} />
+      <RentalDetailsDialog rental={selectedBooking} onClose={() => setSelectedBooking(null)} />
     </PageContainer>
   );
 }
