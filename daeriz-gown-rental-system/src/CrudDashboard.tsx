@@ -15,6 +15,7 @@ import RentalShopReturn from './components/RentalShopReturn';
 import RentalAnalytics from './components/RentalAnalytics';
 import NotificationsProvider from './hooks/useNotifications/NotificationsProvider';
 import DialogsProvider from './hooks/useDialogs/DialogsProvider';
+import OperationsDashboard from './components/OperationsDashboard';
 import AppTheme from './theme/AppTheme';
 import {
   dataGridCustomizations,
@@ -41,6 +42,7 @@ const router = createHashRouter([
       {
         Component: DashboardLayout,
         children: [
+          { path: '/dashboard', Component: OperationsDashboard },
           {
             path: '/itemList',
             Component: ItemList,
@@ -84,7 +86,7 @@ const router = createHashRouter([
           { path: '/fittings', element: <Navigate to="/bookings" replace /> },
           {
             path: '*',
-            Component: ItemList,
+            element: <Navigate to="/dashboard" replace />,
           },
         ],
       },

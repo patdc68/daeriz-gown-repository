@@ -15,6 +15,9 @@ import {
 } from '../services/RentalService';
 import { ImagePreviewDialog, ImageThumbnail } from './ImagePreview';
 import PageContainer from './PageContainer';
+import RentalDetailsDialog from './RentalDetailsDialog';
+import { calculateFinancialSummary, getPaymentsForRentals, type RentalFinancialSummary } from '../services/PaymentService';
+import { formatPeso } from '../utils/currency';
 
 interface RentalListProps {
   status: RentalStatus;
@@ -49,11 +52,18 @@ export default function RentalList({
   const [isLoading, setIsLoading] = React.useState(true);
   const [updatingRentalId, setUpdatingRentalId] = React.useState<string | null>(null);
   const [selectedImage, setSelectedImage] = React.useState<{ url: string; alt: string; title: string } | null>(null);
+  const [selectedRental, setSelectedRental] = React.useState<RentalRecord | null>(null);
+  const [financials, setFinancials] = React.useState<Map<string, RentalFinancialSummary>>(new Map());
 
   const loadData = React.useCallback(async () => {
     setIsLoading(true);
     try {
-      setRows(await getRentalsByStatus(status));
+      const rentalRows = await getRentalsByStatus(status);
+      setRows(rentalRows);
+      const paymentRows = await getPaymentsForRentals(rentalRows.map((rental) => rental.id));
+      const paymentsByRental = new Map<string, typeof paymentRows>();
+      paymentRows.forEach((payment) => paymentsByRental.set(payment.rental_id, [...(paymentsByRental.get(payment.rental_id) ?? []), payment]));
+      setFinancials(new Map(rentalRows.map((rental) => [rental.id, calculateFinancialSummary(rental, paymentsByRental.get(rental.id) ?? [])])));
     } catch (error) {
       console.error('Rental list load failed:', error);
       notifications.show('Unable to load rentals.', { severity: 'error' });
@@ -105,7 +115,17 @@ export default function RentalList({
         renderCell: ({ row }) => <Box><Typography variant="body2">{formatDate(row.date_rented)}</Typography><Typography variant="caption" color="text.secondary">to {formatDate(row.date_returned)}</Typography></Box>,
       },
       {
-        field: 'receipt_img', headerName: 'Receipt', width: 84, sortable: false, filterable: false,
+        field: 'financialStatus', headerName: 'Payment', minWidth: 145, sortable: false, filterable: false,
+        renderCell: ({ row }) => {
+          const summary = financials.get(row.id);
+          if (!summary) return '—';
+          return summary.paymentStatus === 'Paid'
+            ? <Chip size="small" color="success" label="Paid" />
+            : <Chip size="small" color="warning" variant="outlined" label={`${formatPeso(summary.rentalBalance)} Balance`} />;
+        },
+      },
+      {
+        field: 'receipt_img', headerName: 'Legacy Receipt', width: 112, sortable: false, filterable: false,
         renderCell: ({ row }) => <ImageThumbnail src={row.receipt_img} alt={`Receipt for ${row.renter_name}`} fallback="No receipt" size={42} onPreview={(url, alt) => setSelectedImage({ url, alt, title: 'Receipt image preview' })} />,
       },
     ];
@@ -124,7 +144,7 @@ export default function RentalList({
       ) : <Chip size="small" label={row.status} color={chipColor[row.status]} variant={row.status === 'Completed' ? 'outlined' : 'filled'} />,
     });
     return reportColumns;
-  }, [allowStatusUpdate, handleStatusChange, showActualReturn, updatingRentalId]);
+  }, [allowStatusUpdate, financials, handleStatusChange, showActualReturn, updatingRentalId]);
 
   const visibleRows = React.useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
@@ -156,12 +176,18 @@ export default function RentalList({
             initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
             autoHeight
             disableRowSelectionOnClick
+            onRowClick={(params, event) => {
+              const target = event.target as HTMLElement;
+              if (target.closest('button, input, [role="combobox"]')) return;
+              setSelectedRental(params.row);
+            }}
             localeText={{ noRowsLabel: search ? 'No rentals match your search.' : `No ${status.toLowerCase()} rentals.` }}
             sx={{ minWidth: 920 }}
           />
         </Box>
       </Stack>
       <ImagePreviewDialog imageUrl={selectedImage?.url ?? null} alt={selectedImage?.alt ?? 'Rental image'} title={selectedImage?.title} onClose={() => setSelectedImage(null)} />
+      <RentalDetailsDialog rental={selectedRental} onClose={() => setSelectedRental(null)} />
     </PageContainer>
   );
 }

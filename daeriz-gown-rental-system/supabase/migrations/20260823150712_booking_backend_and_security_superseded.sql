@@ -1,0 +1,7 @@
+-- Superseded before deployment by the narrowly scoped runtime reconciliation
+-- migrations dated 20260823150250 through 20260823150316.
+--
+-- The original draft combined booking transactions with global RLS, grants, and
+-- Storage policy changes. Live inspection showed no part of that draft had been
+-- applied, so it is intentionally a no-op. The global authorization rollout is
+-- deferred until each authenticated workflow can be regression-tested by role.

@@ -10,6 +10,7 @@ import ArticleIcon from '@mui/icons-material/Article';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import DescriptionIcon from '@mui/icons-material/Description';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
 import { matchPath, useLocation } from 'react-router';
 import DashboardSidebarContext from '../context/DashboardSidebarContext';
 import { DRAWER_WIDTH, MINI_DRAWER_WIDTH } from '../Constant';
@@ -134,13 +135,21 @@ export default function DashboardSidebar({
               width: mini ? MINI_DRAWER_WIDTH : 'auto',
             }}
           >
+            <DashboardSidebarPageItem
+              id="dashboard"
+              title="Dashboard"
+              icon={<DashboardRoundedIcon />}
+              href="/dashboard"
+              selected={!!matchPath('/dashboard', pathname) || pathname === '/'}
+            />
+            <DashboardSidebarDividerItem />
             <DashboardSidebarHeaderItem>Inventory</DashboardSidebarHeaderItem>
             <DashboardSidebarPageItem
               id="employees"
               title="Stocks"
               icon={<ArticleIcon />}
               href="/itemList"
-              selected={!!matchPath('/itemList/*', pathname) || pathname === '/'}
+              selected={!!matchPath('/itemList/*', pathname)}
             />
             <DashboardSidebarDividerItem />
             <DashboardSidebarHeaderItem>Rentals</DashboardSidebarHeaderItem>

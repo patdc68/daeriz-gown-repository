@@ -13,14 +13,12 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import UploadRoundedIcon from '@mui/icons-material/UploadRounded';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import {
   createRental,
   getRentalErrorMessage,
-  uploadRentalReceipt,
   type CreateRentalValues,
 } from '../services/RentalService';
 import { getBookingOptions, type BookingBranch, type BookingItem } from '../services/BookingService';
@@ -34,6 +32,9 @@ const initialValues: CreateRentalValues = {
   date_returned: '',
   renter_name: '',
   renter_contact_no: '',
+  rental_amount: 0,
+  security_deposit_amount: 0,
+  discount_amount: 0,
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -51,8 +52,6 @@ export default function CreateRental() {
   const [items, setItems] = React.useState<BookingItem[]>([]);
   const [branches, setBranches] = React.useState<BookingBranch[]>([]);
   const [values, setValues] = React.useState<CreateRentalValues>(initialValues);
-  const [receiptFile, setReceiptFile] = React.useState<File | null>(null);
-  const [receiptPreview, setReceiptPreview] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isLoadingOptions, setIsLoadingOptions] = React.useState(true);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -68,30 +67,11 @@ export default function CreateRental() {
       .finally(() => setIsLoadingOptions(false));
   }, []);
 
-  React.useEffect(() => () => {
-    if (receiptPreview) URL.revokeObjectURL(receiptPreview);
-  }, [receiptPreview]);
-
   const branchItems = React.useMemo(
     () => values.branch_id ? items.filter((item) => item.branch_id === values.branch_id) : [],
     [items, values.branch_id],
   );
   const selectedItem = branchItems.find((item) => item.id === values.item_rented_id) ?? null;
-
-  const handleReceiptChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    setErrorMessage(null);
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setReceiptFile(null);
-      setErrorMessage('Receipt image must be an image file.');
-      event.target.value = '';
-      return;
-    }
-    if (receiptPreview) URL.revokeObjectURL(receiptPreview);
-    setReceiptFile(file);
-    setReceiptPreview(URL.createObjectURL(file));
-  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -106,8 +86,7 @@ export default function CreateRental() {
 
     setIsSubmitting(true);
     try {
-      const receiptImg = receiptFile ? await uploadRentalReceipt(receiptFile) : undefined;
-      await createRental({ ...values, receipt_img: receiptImg });
+      await createRental(values);
       notifications.show('Rental created successfully.', { severity: 'success' });
       navigate('/bookings');
     } catch (error) {
@@ -189,15 +168,21 @@ export default function CreateRental() {
             </Grid>
           </Section>
 
-          <Section title="Payment">
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
-              <Button variant="outlined" component="label" startIcon={<UploadRoundedIcon />} disabled={isSubmitting}>
-                Upload Receipt Image
-                <input hidden type="file" accept="image/*" onChange={handleReceiptChange} />
-              </Button>
-              {receiptFile && <Typography variant="body2" color="success.main">{receiptFile.name} selected</Typography>}
-              {receiptPreview && <Box component="img" src={receiptPreview} alt="Receipt preview" sx={{ width: 96, height: 96, borderRadius: 1.5, border: '1px solid', borderColor: 'divider', objectFit: 'contain' }} />}
-            </Stack>
+          <Section title="Financial Agreement">
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <TextField required fullWidth type="number" label="Rental Amount" value={values.rental_amount} onChange={(event) => setValues((current) => ({ ...current, rental_amount: Number(event.target.value) }))} slotProps={{ htmlInput: { min: 0, step: '0.01' } }} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <TextField required fullWidth type="number" label="Security Deposit Required" value={values.security_deposit_amount} onChange={(event) => setValues((current) => ({ ...current, security_deposit_amount: Number(event.target.value) }))} slotProps={{ htmlInput: { min: 0, step: '0.01' } }} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <TextField required fullWidth type="number" label="Discount" value={values.discount_amount} onChange={(event) => setValues((current) => ({ ...current, discount_amount: Number(event.target.value) }))} slotProps={{ htmlInput: { min: 0, max: values.rental_amount, step: '0.01' } }} helperText="Cannot exceed the rental amount." />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <Alert severity="info">Payments and receipt images are recorded from Rental Details after this rental is created.</Alert>
+              </Grid>
+            </Grid>
           </Section>
 
           <Stack direction={{ xs: 'column-reverse', sm: 'row' }} justifyContent="flex-end" gap={1}>

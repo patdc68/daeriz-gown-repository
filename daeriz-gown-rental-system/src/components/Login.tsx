@@ -24,7 +24,7 @@ export default function Login() {
         const checkSession = async () => {
             const { data } = await supabase.auth.getSession();
             if (data.session) {
-                navigate('/itemList', { replace: true });
+                navigate('/dashboard', { replace: true });
             }
         };
         checkSession();
@@ -40,7 +40,7 @@ export default function Login() {
                 setError('Unable to sign in. Check your email and password.');
                 return;
             }
-            navigate('/itemList');
+            navigate('/dashboard');
         } finally {
             setLoading(false);
         }
